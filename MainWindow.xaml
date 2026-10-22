@@ -1,0 +1,138 @@
+<Window x:Class="DuckDuck.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="DuckDuck" Icon="duck.ico"
+        Width="860" Height="680" MinWidth="740" MinHeight="600"
+        Background="{StaticResource Bg}" Foreground="{StaticResource Text}"
+        FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="13"
+        WindowStartupLocation="CenterScreen">
+    <Grid Margin="32">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- header -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,24">
+            <Border DockPanel.Dock="Right" Background="{StaticResource Panel}" BorderBrush="{StaticResource Track}" BorderThickness="1" CornerRadius="12" Padding="12,5" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse x:Name="StatusDot" Width="8" Height="8" Fill="{StaticResource Muted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="StatusText" Text="Idle" FontWeight="SemiBold" Foreground="{StaticResource Muted}" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="StatusReadout" Style="{StaticResource Readout}" Foreground="{StaticResource Blue}" Margin="10,0,0,0"/>
+                </StackPanel>
+            </Border>
+            <StackPanel Orientation="Horizontal">
+                <Image Source="duck.ico" Width="28" Height="28" Margin="0,0,12,0"/>
+                <TextBlock Text="DuckDuck" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- panels -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" BorderBrush="{StaticResource Amber}" BorderThickness="4" CornerRadius="10"
+                    Background="{StaticResource Panel}" Padding="16">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,16">
+                        <TextBlock Text="&#xE767;" FontFamily="{StaticResource Glyph}" FontSize="18" Foreground="{StaticResource Amber}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                        <TextBlock Text="SOURCES" FontWeight="Bold" Foreground="{StaticResource Amber}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                        <TextBlock Text="when these play" Foreground="{StaticResource Muted}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <Button x:Name="AddSource" DockPanel.Dock="Bottom" Style="{StaticResource Flat}" HorizontalAlignment="Left" Click="AddSource_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE710;" FontFamily="{StaticResource Glyph}" FontSize="12" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="add app"/>
+                        </StackPanel>
+                    </Button>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="SourceList"/>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="24,0">
+                <TextBlock Text="&#xE72A;" FontFamily="{StaticResource Glyph}" FontSize="32" Foreground="{StaticResource Amber}" HorizontalAlignment="Center"/>
+                <TextBlock Text="duck" Foreground="{StaticResource Muted}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+            </StackPanel>
+
+            <Border x:Name="TargetBorder" Grid.Column="2" BorderBrush="{StaticResource BlueDim}" BorderThickness="4" CornerRadius="10"
+                    Background="{StaticResource Panel}" Padding="16">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,16">
+                        <TextBlock Text="&#xE7F6;" FontFamily="{StaticResource Glyph}" FontSize="18" Foreground="{StaticResource Blue}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                        <TextBlock Text="TARGET" FontWeight="Bold" Foreground="{StaticResource Blue}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                        <TextBlock Text="duck this" Foreground="{StaticResource Muted}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <Button x:Name="ChangeTarget" DockPanel.Dock="Bottom" Style="{StaticResource Flat}" HorizontalAlignment="Left" Click="ChangeTarget_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE8AB;" FontFamily="{StaticResource Glyph}" FontSize="12" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="ChangeTargetText" Text="change"/>
+                        </StackPanel>
+                    </Button>
+                    <StackPanel x:Name="TargetBox"/>
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <!-- settings -->
+        <Grid Grid.Row="2" Margin="0,24,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="90"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="80"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="120"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Duck to" Style="{StaticResource Label}"/>
+            <Slider x:Name="DuckTo" Grid.Row="0" Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,4" ValueChanged="Setting_Changed"/>
+            <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding Value, ElementName=DuckTo, StringFormat={}{0:0} %}" Style="{StaticResource Readout}" Margin="12,0,0,0"/>
+
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Attack" Style="{StaticResource Label}"/>
+            <Slider x:Name="Attack" Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="5000" TickFrequency="10" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,4" ValueChanged="Setting_Changed"/>
+            <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Value, ElementName=Attack, StringFormat={}{0:0} ms}" Style="{StaticResource Readout}" Margin="12,0,0,0"/>
+            <TextBlock Grid.Row="1" Grid.Column="3" Text="curve" Style="{StaticResource Label}" Margin="12,0,8,0"/>
+            <ComboBox x:Name="AttackCurve" Grid.Row="1" Grid.Column="4" VerticalAlignment="Center" SelectionChanged="Setting_Changed"/>
+
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Release" Style="{StaticResource Label}"/>
+            <Slider x:Name="Release" Grid.Row="2" Grid.Column="1" Minimum="0" Maximum="10000" TickFrequency="10" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,4" ValueChanged="Setting_Changed"/>
+            <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding Value, ElementName=Release, StringFormat={}{0:0} ms}" Style="{StaticResource Readout}" Margin="12,0,0,0"/>
+            <TextBlock Grid.Row="2" Grid.Column="3" Text="curve" Style="{StaticResource Label}" Margin="12,0,8,0"/>
+            <ComboBox x:Name="ReleaseCurve" Grid.Row="2" Grid.Column="4" VerticalAlignment="Center" SelectionChanged="Setting_Changed"/>
+
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="Hold" Style="{StaticResource Label}"/>
+            <Slider x:Name="Hold" Grid.Row="3" Grid.Column="1" Minimum="0" Maximum="5000" TickFrequency="10" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,4" ValueChanged="Setting_Changed"/>
+            <TextBlock Grid.Row="3" Grid.Column="2" Text="{Binding Value, ElementName=Hold, StringFormat={}{0:0} ms}" Style="{StaticResource Readout}" Margin="12,0,0,0"/>
+        </Grid>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,16,0,0">
+            <CheckBox x:Name="EnabledBox" Content="Ducking enabled" Margin="0,0,24,0" Checked="Setting_Changed" Unchecked="Setting_Changed"/>
+            <CheckBox x:Name="StartMin" Content="Start minimized to tray" Checked="Setting_Changed" Unchecked="Setting_Changed"/>
+        </StackPanel>
+
+        <!-- app picker; anchored to whichever button opened it -->
+        <Popup x:Name="Picker" StaysOpen="False" Placement="Bottom" AllowsTransparency="True" PopupAnimation="Fade">
+            <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Track}" BorderThickness="1" CornerRadius="8" Padding="8" MinWidth="280" MaxHeight="360">
+                <StackPanel>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="300">
+                        <StackPanel x:Name="PickerList"/>
+                    </ScrollViewer>
+                    <TextBlock Text="Don't see your app? Play something in it, then reopen." Style="{StaticResource Hint}" Margin="6,8,6,2"/>
+                </StackPanel>
+            </Border>
+        </Popup>
+    </Grid>
+</Window>
