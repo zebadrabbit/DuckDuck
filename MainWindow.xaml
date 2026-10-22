@@ -120,7 +120,8 @@
 
         <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,16,0,0">
             <CheckBox x:Name="EnabledBox" Content="Ducking enabled" Margin="0,0,24,0" Checked="Setting_Changed" Unchecked="Setting_Changed"/>
-            <CheckBox x:Name="StartMin" Content="Start minimized to tray" Checked="Setting_Changed" Unchecked="Setting_Changed"/>
+            <CheckBox x:Name="StartMin" Content="Start minimized to tray" Margin="0,0,24,0" Checked="Setting_Changed" Unchecked="Setting_Changed"/>
+            <CheckBox x:Name="RunAtStartup" Content="Run at Windows startup" Checked="Startup_Changed" Unchecked="Startup_Changed"/>
         </StackPanel>
 
         <!-- app picker; anchored to whichever button opened it -->

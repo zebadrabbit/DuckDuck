@@ -92,6 +92,7 @@ units (linear 0–1, same as the Windows slider).
 | Threshold (per source, on its row) | 5 % | 0–50 % |
 | Ducking enabled | on | off: a duck in progress releases normally, then nothing triggers |
 | Start minimized to tray | off | |
+| Run at Windows startup | off | HKCU Run entry `"<exe>" --tray`; the registry is the state, not config.json. Re-pointed to the current exe on every launch. |
 
 Hold is the quiet time required before release begins. It stops the volume pumping
 between words.

@@ -84,6 +84,7 @@ launch if it had no chance to.
 | Trigger at (per source) | 5 % | Peak level a source must reach to count as playing |
 | Ducking enabled | on | Off lets a duck in progress release, then never triggers |
 | Start minimized to tray | off | |
+| Run at Windows startup | off | Adds a Run entry for the current user; starts in the tray |
 
 Curves, as easing of the ramp's progress:
 

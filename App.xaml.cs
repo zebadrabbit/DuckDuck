@@ -20,9 +20,8 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        if (e.Args.Length > 0) { AttachConsole(-1); Console.WriteLine(); }
-        if (e.Args.Contains("--selftest")) { Ducker.SelfTest(); Shutdown(0); return; }
-        if (e.Args.Contains("--list")) { ListApps(); Shutdown(0); return; }
+        if (e.Args.Contains("--selftest")) { AttachConsole(-1); Console.WriteLine(); Ducker.SelfTest(); Shutdown(0); return; }
+        if (e.Args.Contains("--list")) { AttachConsole(-1); Console.WriteLine(); ListApps(); Shutdown(0); return; }
 
         single = new Mutex(true, "DuckDuck.SingleInstance", out bool first);
         wake = new EventWaitHandle(false, EventResetMode.AutoReset, "DuckDuck.Show");
@@ -51,9 +50,10 @@ public partial class App : Application
         };
         tray.MouseClick += (_, me) => { if (me.Button == Forms.MouseButtons.Left) ShowMain(); };
         Apply(Config);
+        if (AutoStart.Enabled) AutoStart.Set(true);   // re-point the Run entry at wherever this exe lives now
 
         MainWindow = new MainWindow();
-        if (!Config.StartMinimized) MainWindow.Show();
+        if (!Config.StartMinimized && !e.Args.Contains("--tray")) MainWindow.Show();   // --tray: launched by Windows at logon, stay out of the way
     }
 
     /// The one place a new Config goes live: engine, tray tooltip. Saving is the caller's job.
@@ -76,6 +76,25 @@ public partial class App : Application
         tray?.Dispose();
         Engine?.Stop();
         base.OnExit(e);
+    }
+
+    /// Run-at-logon via HKCU\...\Run. The registry holds the state; nothing in config.json.
+    public static class AutoStart
+    {
+        const string Key = @"Software\Microsoft\Windows\CurrentVersion\Run";
+        static string Command => $"\"{Environment.ProcessPath}\" --tray";
+
+        public static bool Enabled
+        {
+            get { using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(Key); return k?.GetValue("DuckDuck") != null; }
+        }
+
+        public static void Set(bool on)
+        {
+            using var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(Key);
+            if (on) k.SetValue("DuckDuck", Command);
+            else k.DeleteValue("DuckDuck", throwOnMissingValue: false);
+        }
     }
 
     /// `DuckDuck.exe --list`: dump audio apps + peaks for 5 s. The M2 go/no-go check.

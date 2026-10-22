@@ -43,6 +43,7 @@ public partial class MainWindow : Window
         ReleaseCurve.SelectedItem = c.ReleaseCurve;
         EnabledBox.IsChecked = c.Enabled;
         StartMin.IsChecked = c.StartMinimized;
+        RunAtStartup.IsChecked = App.AutoStart.Enabled;   // the registry is the truth for this one, not config.json
         loading = false;
 
         RebuildSources();
@@ -67,6 +68,11 @@ public partial class MainWindow : Window
         loading = true;
         EnabledBox.IsChecked = Cfg.Enabled;
         loading = false;
+    }
+
+    void Startup_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!loading) App.AutoStart.Set(RunAtStartup.IsChecked == true);
     }
 
     void Setting_Changed(object sender, RoutedEventArgs e)
