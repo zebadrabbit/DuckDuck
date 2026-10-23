@@ -20,7 +20,7 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        if (e.Args.Contains("--selftest")) { AttachConsole(-1); Console.WriteLine(); Mta(ProcessMeter.SelfTest); Ducker.SelfTest(); Shutdown(0); return; }
+        if (e.Args.Contains("--selftest")) { AttachConsole(-1); Console.WriteLine(); Mta(CaptureMeter.SelfTest); Ducker.SelfTest(); Shutdown(0); return; }
         if (e.Args.Contains("--list")) { AttachConsole(-1); Console.WriteLine(); ListApps(); Shutdown(0); return; }
 
         single = new Mutex(true, "DuckDuck.SingleInstance", out bool first);

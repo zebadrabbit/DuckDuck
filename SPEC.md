@@ -49,9 +49,11 @@ voice engine keeps one open on the output device, so its session meter mirrors t
 mix and would duck the target whenever the target itself plays. Session meters are the
 fallback when activation fails (older Windows).
 
-**Microphone** is offered as a pseudo-source: the default communications capture device's
-endpoint meter. It only moves while some app is recording from the mic (Discord in a
-call), it is the raw level before Discord's noise gate, and it cannot be a target.
+**Microphone** is offered as a pseudo-source: the default communications capture device.
+While it is a configured source DuckDuck holds its own capture stream on it, so the level
+is live whether or not another app records, and Windows shows the mic in use. Otherwise
+only the endpoint meter is read, which moves while some app records from the mic. It is
+the raw level before Discord's noise gate, and it cannot be a target.
 
 ## Behaviour
 

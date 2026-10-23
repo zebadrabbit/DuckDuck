@@ -39,10 +39,11 @@ SmartScreen may warn the first time because the exe isn't code-signed. Click
 - **add app** under SOURCES lists every app that currently has an audio session. Pick
   the ones that should trigger ducking. Each source gets its own **Trigger at** slider
   and a tick on its level meter, so you can watch the peak cross it.
-- **Microphone** in the same list is your default mic, so you can duck when *you* talk.
-  Its level only moves while some app is recording from the mic (Discord in a call), and
-  it is the raw level before Discord's noise gate, so raise its **Trigger at** until
-  keyboard noise stays under the tick.
+- **Microphone** in the same list is your default communications mic, so you can duck
+  when *you* talk. While it is a source, DuckDuck keeps the mic open to read its level, so
+  Windows shows the mic in use. It is the raw level before Discord's noise gate, so raise
+  its **Trigger at** until keyboard noise stays under the tick. Set Windows' default
+  communications input to the mic Discord uses.
 - **pick app** under TARGET chooses the app to duck.
 - Don't see your app? Play something in it, then reopen the picker. Windows only
   creates an audio session once an app has made sound.
@@ -130,10 +131,11 @@ notes it was written from.
   Discord's *Voice & Video → Attenuation* lowers other apps when people talk, and the
   *Communications* tab of the classic Windows Sound panel does the same when a call
   starts. Turn both off and let DuckDuck do it alone.
-- **A source's meter is dimmed.** Process loopback is unavailable (Windows before
-  10 2004), so that source's level is the plain session meter, which also includes other
-  apps' audio when the source records the output mix. `DuckDuck.exe --list` marks such
-  apps with `*`.
+- **A source's meter is dimmed.** For an app, process loopback is unavailable (Windows
+  before 10 2004), so its level is the plain session meter, which also includes other
+  apps' audio when the source records the output mix. For Microphone, DuckDuck could not
+  open the mic: check *Settings → Privacy → Microphone → Let desktop apps access your
+  microphone*. `DuckDuck.exe --list` marks such sources with `*`.
 - **Nothing ducks.** Check **Ducking enabled** in the window or the tray menu, and that
   the source's meter actually crosses its tick while it plays.
 

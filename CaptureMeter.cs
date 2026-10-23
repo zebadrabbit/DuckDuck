@@ -5,25 +5,48 @@ using NAudio.Wave;
 
 namespace DuckDuck;
 
-/// Peak meter fed by Windows process loopback (Windows 10 2004+): only what the process tree
-/// actually renders, on any device. A session's IAudioMeterInformation also counts the
-/// session's loopback *capture* streams, so Discord's echo-cancel tap on the output device
-/// makes its session meter mirror the whole mix (anything Brave plays reads as Discord).
-/// Use from the thread that created it; that thread must be MTA or the activation callback
-/// deadlocks against the blocked Wait below.
-public sealed class ProcessMeter : IDisposable
+/// Peak meter over a WASAPI capture stream we own, as 16-bit 48 kHz stereo (the engine converts).
+/// ForProcess: Windows process loopback (Windows 10 2004+), only what the process tree actually
+/// renders, on any device. A session's IAudioMeterInformation also counts the session's loopback
+/// *capture* streams, so Discord's echo-cancel tap on the output device makes its session meter
+/// mirror the whole mix (anything Brave plays reads as Discord).
+/// ForDevice: a microphone. Its endpoint meter only moves while some app records from it, so
+/// holding our own stream keeps the level live.
+/// Use from the thread that created it; for ForProcess that thread must be MTA or the activation
+/// callback deadlocks against the blocked Wait below.
+public sealed class CaptureMeter : IDisposable
 {
     readonly AudioClient client;
     readonly AudioCaptureClient capture;
+    readonly MMDevice? owned;
     short[] buf = new short[4096];
 
     /// null when activation fails (older Windows, process already gone): caller falls back to session meters.
-    public static ProcessMeter? TryCreate(uint pid)
+    public static CaptureMeter? ForProcess(uint pid)
     {
-        try { return new ProcessMeter(pid); } catch { return null; }
+        AudioClient? c = null;
+        try { c = Activate(pid); return new CaptureMeter(c, AudioClientStreamFlags.Loopback, null); }
+        catch { c?.Dispose(); return null; }
     }
 
-    ProcessMeter(uint pid)
+    /// Takes ownership of dev, which must be a fresh MMDevice (its AudioClient is created once per
+    /// instance). null when the mic cannot be opened: Windows privacy setting, device gone.
+    public static CaptureMeter? ForDevice(MMDevice dev)
+    {
+        try { return new CaptureMeter(dev.AudioClient, AudioClientStreamFlags.AutoConvertPcm | AudioClientStreamFlags.SrcDefaultQuality, dev); }
+        catch { dev.Dispose(); return null; }
+    }
+
+    CaptureMeter(AudioClient c, AudioClientStreamFlags flags, MMDevice? owned)
+    {
+        client = c;
+        this.owned = owned;
+        client.Initialize(AudioClientShareMode.Shared, flags, 2_000_000, 0, new WaveFormat(48000, 16, 2), Guid.Empty);
+        capture = client.AudioCaptureClient;
+        client.Start();
+    }
+
+    static AudioClient Activate(uint pid)
     {
         var handler = new Handler();
         var riid = typeof(IAudioClient).GUID;
@@ -40,21 +63,13 @@ public sealed class ProcessMeter : IDisposable
             if (!handler.Done.Wait(2000)) throw new TimeoutException();
             op.GetActivateResult(out int hr, out object? unk);
             Marshal.ThrowExceptionForHR(hr);
-            client = new AudioClient((IAudioClient)unk!);
+            return new AudioClient((IAudioClient)unk!);   // the virtual device has no mix format; Initialize asks for ours
         }
         finally { Marshal.FreeHGlobal(pv); Marshal.FreeHGlobal(blob); }
-        try
-        {
-            // The virtual device has no mix format; ask for 16-bit 48 kHz stereo and the engine converts.
-            client.Initialize(AudioClientShareMode.Shared, AudioClientStreamFlags.Loopback, 2_000_000, 0, new WaveFormat(48000, 16, 2), Guid.Empty);
-            capture = client.AudioCaptureClient;
-            client.Start();
-        }
-        catch { client.Dispose(); throw; }
     }
 
-    /// Peak 0..1 of everything rendered since the last call. Call every tick: the buffer holds
-    /// 200 ms and older audio is dropped. Reads 0 once the process has exited.
+    /// Peak 0..1 of everything captured since the last call. Call every tick: the buffer holds
+    /// 200 ms and older audio is dropped. Reads 0 once the process or device is gone.
     public float Peak()
     {
         int max = 0;
@@ -73,7 +88,7 @@ public sealed class ProcessMeter : IDisposable
                 capture.ReleaseBuffer(frames);
             }
         }
-        catch { /* ponytail: a dead stream reads 0 until its PID's sessions expire and the rescan drops it */ }
+        catch { /* ponytail: a dead stream reads 0 until the rescan drops it */ }
         return max / 32768f;
     }
 
@@ -82,6 +97,7 @@ public sealed class ProcessMeter : IDisposable
         try { client.Stop(); } catch { }
         capture.Dispose();
         client.Dispose();
+        owned?.Dispose();
     }
 
     // ---- `DuckDuck.exe --selftest` (run on an MTA thread) ------------------------------------
@@ -90,7 +106,7 @@ public sealed class ProcessMeter : IDisposable
     /// fall back to session meters without a word.
     public static void SelfTest()
     {
-        using var m = TryCreate((uint)Environment.ProcessId);
+        using var m = ForProcess((uint)Environment.ProcessId);
         if (m == null) { Console.Error.WriteLine("FAIL: process loopback activation (Windows 10 2004+ required)"); Environment.Exit(1); }
         m.Peak();
         Console.WriteLine("process loopback OK");

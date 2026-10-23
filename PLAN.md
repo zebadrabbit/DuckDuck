@@ -39,7 +39,7 @@ thing that could sink the project, so it's spiked before any UI.
   process name via `Process.GetProcessById(pid).ProcessName`, cached per PID (cache
   checked against the process start time: Windows reuses PIDs within seconds).
   Group into `Dictionary<string, List<AudioSessionControl>>` keyed by process name.
-- `Peak(name)` = max `ProcessMeter.Peak()` over the group's processes; session
+- `Peak(name)` = max `CaptureMeter.Peak()` over the group's processes; session
   `MasterPeakValue` only when no process could be metered (see v1.0.1 below).
 - `GetVolume(name)` = first session's `SimpleAudioVolume.Volume`.
 - `SetVolume(name, v)` → every session in the group.
@@ -129,7 +129,9 @@ thing that could sink the project, so it's spiked before any UI.
    unless you want it.
 4. **Mic as a trigger** (duck when *you* talk, not just when Discord outputs): added
    after 1.0.1 as the `Microphone` pseudo-source, the default communications capture
-   endpoint's meter. Raw level before Discord's gate, and only live while an app records.
+   device. Raw level before Discord's gate. DuckDuck holds its own capture stream while it
+   is a source (`CaptureMeter.ForDevice`); the endpoint meter alone is dead unless some app
+   records.
 
 ## Skipped on purpose
 
@@ -159,7 +161,7 @@ streams are not in it. Prototype verified on this machine: Discord's process met
 0.000 while its session meter shows Brave's 0.055; Brave's and WoW's process meters match
 their session meters.
 
-- `ProcessMeter.cs` (new, ~80 lines): own interop for `ActivateAudioInterfaceAsync` and
+- `CaptureMeter.cs` (new, ~110 lines): own interop for `ActivateAudioInterfaceAsync` and
   its completion handler; NAudio's public `AudioClient(IAudioClient)` and
   `AudioCaptureClient` do the rest. `Peak()` = max |sample| drained since the last call.
   `TryCreate` returns null when activation fails (Windows before 10 2004) → session meter.

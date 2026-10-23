@@ -50,6 +50,7 @@ public sealed class Engine
                 double now = sw.Elapsed.TotalMilliseconds;
                 float dt = (float)(now - last);
                 last = now;
+                audio.MicWanted = cfg.Sources.Contains(AudioSessions.Mic, StringComparer.OrdinalIgnoreCase);   // a change marks Dirty
                 if (now >= nextScan || audio.Dirty) { audio.Rescan(); nextScan = now + 2000; }
 
                 var c = cfg;
