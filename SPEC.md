@@ -49,6 +49,10 @@ voice engine keeps one open on the output device, so its session meter mirrors t
 mix and would duck the target whenever the target itself plays. Session meters are the
 fallback when activation fails (older Windows).
 
+**Microphone** is offered as a pseudo-source: the default communications capture device's
+endpoint meter. It only moves while some app is recording from the mic (Discord in a
+call), it is the raw level before Discord's noise gate, and it cannot be a target.
+
 ## Behaviour
 
 Engine ticks every 20 ms:

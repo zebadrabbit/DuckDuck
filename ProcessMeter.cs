@@ -84,6 +84,18 @@ public sealed class ProcessMeter : IDisposable
         client.Dispose();
     }
 
+    // ---- `DuckDuck.exe --selftest` (run on an MTA thread) ------------------------------------
+
+    /// Fails loudly when activation does not work here, because the engine would otherwise
+    /// fall back to session meters without a word.
+    public static void SelfTest()
+    {
+        using var m = TryCreate((uint)Environment.ProcessId);
+        if (m == null) { Console.Error.WriteLine("FAIL: process loopback activation (Windows 10 2004+ required)"); Environment.Exit(1); }
+        m.Peak();
+        Console.WriteLine("process loopback OK");
+    }
+
     [DllImport("Mmdevapi.dll", ExactSpelling = true, PreserveSig = false)]
     static extern void ActivateAudioInterfaceAsync([MarshalAs(UnmanagedType.LPWStr)] string deviceInterfacePath, ref Guid riid, IntPtr activationParams,
         IActivateAudioInterfaceCompletionHandler completionHandler, out IActivateAudioInterfaceAsyncOperation activationOperation);

@@ -20,7 +20,7 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        if (e.Args.Contains("--selftest")) { AttachConsole(-1); Console.WriteLine(); Ducker.SelfTest(); Shutdown(0); return; }
+        if (e.Args.Contains("--selftest")) { AttachConsole(-1); Console.WriteLine(); Mta(ProcessMeter.SelfTest); Ducker.SelfTest(); Shutdown(0); return; }
         if (e.Args.Contains("--list")) { AttachConsole(-1); Console.WriteLine(); ListApps(); Shutdown(0); return; }
 
         single = new Mutex(true, "DuckDuck.SingleInstance", out bool first);
@@ -98,20 +98,25 @@ public partial class App : Application
     }
 
     /// `DuckDuck.exe --list`: dump audio apps + peaks for 5 s. The M2 go/no-go check.
-    static void ListApps()
+    /// `*` after a peak: session-meter fallback, process loopback unavailable for that app.
+    static void ListApps() => Mta(() =>
     {
-        var t = new Thread(() =>   // MTA like the engine: process-loopback activation calls back from COM and would deadlock a blocked STA
+        using var audio = new AudioSessions();
+        for (int i = 0; i < 10; i++)
         {
-            using var audio = new AudioSessions();
-            for (int i = 0; i < 10; i++)
-            {
-                audio.Rescan();
-                var line = audio.Apps().Values.OrderBy(a => a.Name)
-                    .Select(a => $"{a.Name} peak={a.Peak:0.00} vol={audio.GetVolume(a.Name):0.00}");
-                Console.WriteLine(string.Join("   ", line));
-                Thread.Sleep(500);
-            }
-        });
+            audio.Rescan();
+            var line = audio.Apps().Values.OrderBy(a => a.Name)
+                .Select(a => $"{a.Name} peak={a.Peak:0.00}{(a.Metered ? "" : "*")} vol={audio.GetVolume(a.Name)?.ToString("0.00") ?? "-"}");
+            Console.WriteLine(string.Join("   ", line));
+            Thread.Sleep(500);
+        }
+    });
+
+    /// Run on an MTA thread like the engine: process-loopback activation calls back from COM
+    /// and would deadlock a blocked STA (the WPF main thread).
+    static void Mta(ThreadStart f)
+    {
+        var t = new Thread(f);
         t.SetApartmentState(ApartmentState.MTA);
         t.Start();
         t.Join();

@@ -182,6 +182,7 @@ public partial class MainWindow : Window
             : new TextBlock { Text = "", FontFamily = Glyph, FontSize = 18, Foreground = B("Muted") };
         icon.Margin = new Thickness(0, 0, 10, 0);
         icon.VerticalAlignment = VerticalAlignment.Center;
+        if (icon is TextBlock tb && name == AudioSessions.Mic) tb.Text = "";   // Segoe mic glyph
         DockPanel.SetDock(icon, Dock.Left);
         row.Children.Add(icon);
         row.Children.Add(new TextBlock { Text = Pretty(name), FontSize = 14, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
@@ -240,6 +241,8 @@ public partial class MainWindow : Window
             bool running = s.Apps.TryGetValue(name, out var a);
             row.Opacity = running ? 1 : 0.45;
             meter.Width = MeterWidth * Level(running ? a!.Peak : 0);
+            var tip = running && !a!.Metered ? "Session meter: process loopback unavailable, so this level can include other apps' audio" : null;
+            if (!Equals(row.ToolTip, tip)) { row.ToolTip = tip; meter.Opacity = tip == null ? 1 : 0.4; }
             if (running && a!.ExePath != null && !icons.ContainsKey(a.ExePath)) { RebuildSources(); return; }   // app appeared: fetch its icon once
         }
         foreach (var (name, m) in pickerMeters)
@@ -284,7 +287,7 @@ public partial class MainWindow : Window
 
         foreach (var a in App.Engine.Snapshot.Apps.Values.OrderBy(a => a.Name))
         {
-            if (chosen.Contains(a.Name)) continue;
+            if (chosen.Contains(a.Name) || forTarget && a.Name == AudioSessions.Mic) continue;   // the mic has no volume to duck
             var name = a.Name;
             var meter = Fill(B(forTarget ? "Blue" : "Amber"));
             var btn = new Button

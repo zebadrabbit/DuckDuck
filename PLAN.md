@@ -127,8 +127,9 @@ thing that could sink the project, so it's spiked before any UI.
    Desktop Runtime installed). Spec says self-contained.
 3. **Run at Windows startup** checkbox: one registry Run key, trivial. Not in v1 scope
    unless you want it.
-4. **Mic as a trigger** (duck when *you* talk, not just when Discord outputs): out of
-   scope. Would need capture-device metering; a later feature, not a v1 one.
+4. **Mic as a trigger** (duck when *you* talk, not just when Discord outputs): added
+   after 1.0.1 as the `Microphone` pseudo-source, the default communications capture
+   endpoint's meter. Raw level before Discord's gate, and only live while an app records.
 
 ## Skipped on purpose
 

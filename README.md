@@ -39,6 +39,10 @@ SmartScreen may warn the first time because the exe isn't code-signed. Click
 - **add app** under SOURCES lists every app that currently has an audio session. Pick
   the ones that should trigger ducking. Each source gets its own **Trigger at** slider
   and a tick on its level meter, so you can watch the peak cross it.
+- **Microphone** in the same list is your default mic, so you can duck when *you* talk.
+  Its level only moves while some app is recording from the mic (Discord in a call), and
+  it is the raw level before Discord's noise gate, so raise its **Trigger at** until
+  keyboard noise stays under the tick.
 - **pick app** under TARGET chooses the app to duck.
 - Don't see your app? Play something in it, then reopen the picker. Windows only
   creates an audio session once an app has made sound.
@@ -82,7 +86,7 @@ launch if it had no chance to.
 | Attack | 150 ms, Fast | Ramp down time and curve |
 | Release | 800 ms, Smooth | Ramp up time and curve |
 | Hold | 400 ms | Quiet time required before release |
-| Trigger at (per source) | 5 % | Peak level a source must reach to count as playing |
+| Trigger at (per source) | 5 % | Peak level a source must reach to count as playing, measured after its own Windows mixer slider: an app turned down to 30 % in the mixer needs a lower trigger |
 | Ducking enabled | on | Off lets a duck in progress release, then never triggers |
 | Start minimized to tray | off | |
 | Run at Windows startup | off | Adds a Run entry for the current user; starts in the tray |
@@ -113,12 +117,25 @@ something isn't working:
 
 ```
 DuckDuck.exe --list       # print the audio apps the engine sees, with peaks and volumes, for 5 s
-DuckDuck.exe --selftest   # run the ducking state machine checks
+DuckDuck.exe --selftest   # check process-loopback activation and the ducking state machine
 ```
 
 The app is C# and WPF on .NET 10 with one dependency, [NAudio](https://github.com/naudio/NAudio),
 for the Windows Core Audio session API. `SPEC.md` and `PLAN.md` are the design and build
 notes it was written from.
+
+## Troubleshooting
+
+- **The target ducks while only the target is playing.** Something else is ducking too.
+  Discord's *Voice & Video → Attenuation* lowers other apps when people talk, and the
+  *Communications* tab of the classic Windows Sound panel does the same when a call
+  starts. Turn both off and let DuckDuck do it alone.
+- **A source's meter is dimmed.** Process loopback is unavailable (Windows before
+  10 2004), so that source's level is the plain session meter, which also includes other
+  apps' audio when the source records the output mix. `DuckDuck.exe --list` marks such
+  apps with `*`.
+- **Nothing ducks.** Check **Ducking enabled** in the window or the tray menu, and that
+  the source's meter actually crosses its tick while it plays.
 
 ## Limitations
 
