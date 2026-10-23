@@ -106,7 +106,7 @@ public partial class App : Application
         {
             audio.Rescan();
             var line = audio.Apps().Values.OrderBy(a => a.Name)
-                .Select(a => $"{a.Name} peak={a.Peak:0.00}{(a.Metered ? "" : "*")} vol={audio.GetVolume(a.Name)?.ToString("0.00") ?? "-"}");
+                .Select(a => $"{a.Name} peak={a.Peak:0.00}{(a.Fallback == null ? "" : "*")} vol={audio.GetVolume(a.Name)?.ToString("0.00") ?? "-"}");
             Console.WriteLine(string.Join("   ", line));
             Thread.Sleep(500);
         }

@@ -128,10 +128,10 @@ thing that could sink the project, so it's spiked before any UI.
 3. **Run at Windows startup** checkbox: one registry Run key, trivial. Not in v1 scope
    unless you want it.
 4. **Mic as a trigger** (duck when *you* talk, not just when Discord outputs): added
-   after 1.0.1 as the `Microphone` pseudo-source, the default communications capture
-   device. Raw level before Discord's gate. DuckDuck holds its own capture stream while it
-   is a source (`CaptureMeter.ForDevice`); the endpoint meter alone is dead unless some app
-   records.
+   after 1.0.1 as the `Microphone` pseudo-source: the endpoint meter of whichever mic some
+   app is recording from, so it follows Discord's mic and is live during calls. Raw level
+   before Discord's gate. Opening a mic ourselves was tried and reverted: it flips Bluetooth
+   headsets into the hands-free profile and the music turns to telephone quality.
 
 ## Skipped on purpose
 

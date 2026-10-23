@@ -241,7 +241,7 @@ public partial class MainWindow : Window
             bool running = s.Apps.TryGetValue(name, out var a);
             row.Opacity = running ? 1 : 0.45;
             meter.Width = MeterWidth * Level(running ? a!.Peak : 0);
-            var tip = running && !a!.Metered ? "Fallback meter: process loopback or microphone access unavailable, so this level can be wrong or dead" : null;
+            var tip = running ? a!.Fallback : null;
             if (!Equals(row.ToolTip, tip)) { row.ToolTip = tip; meter.Opacity = tip == null ? 1 : 0.4; }
             if (running && a!.ExePath != null && !icons.ContainsKey(a.ExePath)) { RebuildSources(); return; }   // app appeared: fetch its icon once
         }

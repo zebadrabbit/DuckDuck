@@ -5,43 +5,31 @@ using NAudio.Wave;
 
 namespace DuckDuck;
 
-/// Peak meter over a WASAPI capture stream we own, as 16-bit 48 kHz stereo (the engine converts).
-/// ForProcess: Windows process loopback (Windows 10 2004+), only what the process tree actually
-/// renders, on any device. A session's IAudioMeterInformation also counts the session's loopback
-/// *capture* streams, so Discord's echo-cancel tap on the output device makes its session meter
-/// mirror the whole mix (anything Brave plays reads as Discord).
-/// ForDevice: a microphone. Its endpoint meter only moves while some app records from it, so
-/// holding our own stream keeps the level live.
-/// Use from the thread that created it; for ForProcess that thread must be MTA or the activation
-/// callback deadlocks against the blocked Wait below.
+/// Peak meter over a Windows process-loopback capture stream (Windows 10 2004+): only what the
+/// process tree actually renders, on any device, as 16-bit 48 kHz stereo (the engine converts).
+/// A session's IAudioMeterInformation also counts the session's loopback *capture* streams, so
+/// Discord's echo-cancel tap on the output device makes its session meter mirror the whole mix
+/// (anything Brave plays reads as Discord).
+/// Use from the thread that created it; that thread must be MTA or the activation callback
+/// deadlocks against the blocked Wait below.
 public sealed class CaptureMeter : IDisposable
 {
     readonly AudioClient client;
     readonly AudioCaptureClient capture;
-    readonly MMDevice? owned;
     short[] buf = new short[4096];
 
     /// null when activation fails (older Windows, process already gone): caller falls back to session meters.
     public static CaptureMeter? ForProcess(uint pid)
     {
         AudioClient? c = null;
-        try { c = Activate(pid); return new CaptureMeter(c, AudioClientStreamFlags.Loopback, null); }
+        try { c = Activate(pid); return new CaptureMeter(c); }
         catch { c?.Dispose(); return null; }
     }
 
-    /// Takes ownership of dev, which must be a fresh MMDevice (its AudioClient is created once per
-    /// instance). null when the mic cannot be opened: Windows privacy setting, device gone.
-    public static CaptureMeter? ForDevice(MMDevice dev)
-    {
-        try { return new CaptureMeter(dev.AudioClient, AudioClientStreamFlags.AutoConvertPcm | AudioClientStreamFlags.SrcDefaultQuality, dev); }
-        catch { dev.Dispose(); return null; }
-    }
-
-    CaptureMeter(AudioClient c, AudioClientStreamFlags flags, MMDevice? owned)
+    CaptureMeter(AudioClient c)
     {
         client = c;
-        this.owned = owned;
-        client.Initialize(AudioClientShareMode.Shared, flags, 2_000_000, 0, new WaveFormat(48000, 16, 2), Guid.Empty);
+        client.Initialize(AudioClientShareMode.Shared, AudioClientStreamFlags.Loopback, 2_000_000, 0, new WaveFormat(48000, 16, 2), Guid.Empty);
         capture = client.AudioCaptureClient;
         client.Start();
     }
@@ -68,8 +56,8 @@ public sealed class CaptureMeter : IDisposable
         finally { Marshal.FreeHGlobal(pv); Marshal.FreeHGlobal(blob); }
     }
 
-    /// Peak 0..1 of everything captured since the last call. Call every tick: the buffer holds
-    /// 200 ms and older audio is dropped. Reads 0 once the process or device is gone.
+    /// Peak 0..1 of everything rendered since the last call. Call every tick: the buffer holds
+    /// 200 ms and older audio is dropped. Reads 0 once the process has exited.
     public float Peak()
     {
         int max = 0;
@@ -88,7 +76,7 @@ public sealed class CaptureMeter : IDisposable
                 capture.ReleaseBuffer(frames);
             }
         }
-        catch { /* ponytail: a dead stream reads 0 until the rescan drops it */ }
+        catch { /* ponytail: a dead stream reads 0 until its PID's sessions expire and the rescan drops it */ }
         return max / 32768f;
     }
 
@@ -97,7 +85,6 @@ public sealed class CaptureMeter : IDisposable
         try { client.Stop(); } catch { }
         capture.Dispose();
         client.Dispose();
-        owned?.Dispose();
     }
 
     // ---- `DuckDuck.exe --selftest` (run on an MTA thread) ------------------------------------

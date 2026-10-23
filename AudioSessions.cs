@@ -5,15 +5,18 @@ using NAudio.CoreAudioApi.Interfaces;
 namespace DuckDuck;
 
 /// Core Audio sessions on every active output device, grouped by process name, plus the
-/// default microphone as a pseudo-app. Use from one thread only (the engine thread, MTA).
+/// microphone in use as a pseudo-app. Use from one thread only (the engine thread, MTA).
 public sealed class AudioSessions : IDisposable
 {
-    /// Metered: the level is what the app renders (process loopback) or our own mic stream.
-    /// false: fallback to the session meter (counts the app's own loopback captures too) or to
-    /// the mic endpoint meter (dead unless some app records).
-    public sealed record AppInfo(string Name, float Peak, string? ExePath, bool Metered = true);
+    /// Fallback: null when the level is trustworthy. Otherwise why it is not, for the UI:
+    /// an app whose level is the session meter (counts its own loopback captures), or the
+    /// mic while no app records from one.
+    public sealed record AppInfo(string Name, float Peak, string? ExePath, string? Fallback = null);
 
-    /// Pseudo-source: the default communications microphone. Cannot be a target.
+    /// Pseudo-source: the endpoint meter of whichever mic some app is recording from (Discord
+    /// in a call). We never open a mic ourselves: that flips a Bluetooth headset into its
+    /// low-quality hands-free profile and can trigger Windows' communications ducking.
+    /// Cannot be a target.
     public const string Mic = "Microphone";
 
     sealed class App { public readonly List<AudioSessionControl> Sessions = new(); public readonly List<Proc> Procs = new(); public string? Exe; }
@@ -23,19 +26,13 @@ public sealed class AudioSessions : IDisposable
 
     readonly MMDeviceEnumerator enumerator = new();
     readonly Dictionary<string, MMDevice> devices = new();
+    readonly Dictionary<string, MMDevice> mics = new();
+    readonly List<MMDevice> micsInUse = new();   // subset of mics some app records from, per rescan
     readonly Dictionary<string, App> apps = new(StringComparer.OrdinalIgnoreCase);
     readonly Dictionary<uint, Proc> procs = new();
-    MMDevice? mic;
-    CaptureMeter? micMeter;
-    bool micWanted;
 
     /// Set from a COM callback when any device gets a new session. Caller rescans and clears it.
     public volatile bool Dirty;
-
-    /// Microphone is a configured source: hold our own capture stream so its level is live
-    /// (Windows shows the mic in use). Otherwise only the endpoint meter is read, which moves
-    /// only while some other app records from the mic.
-    public bool MicWanted { get => micWanted; set { if (micWanted != value) { micWanted = value; Dirty = true; } } }
 
     public void Rescan()
     {
@@ -50,14 +47,15 @@ public sealed class AudioSessions : IDisposable
         }
         foreach (var id in devices.Keys.Where(k => !seen.Contains(k)).ToList()) { devices[id].Dispose(); devices.Remove(id); }
 
-        try
+        seen.Clear();
+        foreach (var dev in enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active))
         {
-            var m = enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
-            if (mic?.ID == m.ID) m.Dispose(); else { mic?.Dispose(); mic = m; micMeter?.Dispose(); micMeter = null; }
+            seen.Add(dev.ID);
+            if (!mics.TryAdd(dev.ID, dev)) dev.Dispose();
         }
-        catch { mic?.Dispose(); mic = null; micMeter?.Dispose(); micMeter = null; }   // no microphone
-        if (mic != null && micWanted && micMeter == null) micMeter = CaptureMeter.ForDevice(enumerator.GetDevice(mic.ID));
-        if (!micWanted && micMeter != null) { micMeter.Dispose(); micMeter = null; }
+        foreach (var id in mics.Keys.Where(k => !seen.Contains(k)).ToList()) { mics[id].Dispose(); mics.Remove(id); }
+        micsInUse.Clear();
+        foreach (var dev in mics.Values) if (Recording(dev)) micsInUse.Add(dev);
 
         foreach (var a in apps.Values) foreach (var s in a.Sessions) s.Dispose();
         apps.Clear();
@@ -79,6 +77,17 @@ public sealed class AudioSessions : IDisposable
             }
         }
         foreach (var pid in procs.Keys.Where(k => !livePids.Contains(k)).ToList()) Drop(pid);
+    }
+
+    /// Some app holds an active capture stream on this mic, so its endpoint meter is live.
+    static bool Recording(MMDevice mic)
+    {
+        var mgr = mic.AudioSessionManager;
+        mgr.RefreshSessions();
+        var col = mgr.Sessions;
+        bool any = false;
+        for (int i = 0; i < col.Count; i++) { var s = col[i]; any |= s.State == AudioSessionState.AudioSessionStateActive; s.Dispose(); }
+        return any;
     }
 
     /// Cached per PID, but checked against the process start time: Windows hands a dead
@@ -136,8 +145,14 @@ public sealed class AudioSessions : IDisposable
     public Dictionary<string, AppInfo> Apps()
     {
         var d = new Dictionary<string, AppInfo>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (n, a) in apps) d[n] = new AppInfo(n, Peak(n), a.Exe, a.Procs.Any(p => p.Meter != null));
-        if (mic != null) d[Mic] = new AppInfo(Mic, micMeter?.Peak() ?? mic.AudioMeterInformation.MasterPeakValue, null, micMeter != null || !micWanted);
+        foreach (var (n, a) in apps)
+            d[n] = new AppInfo(n, Peak(n), a.Exe, a.Procs.Any(p => p.Meter != null) ? null : "Session meter: process loopback unavailable, so this level can include other apps' audio");
+        if (mics.Count > 0)
+        {
+            float peak = 0;
+            foreach (var m in micsInUse) peak = Math.Max(peak, m.AudioMeterInformation.MasterPeakValue);
+            d[Mic] = new AppInfo(Mic, peak, null, micsInUse.Count > 0 ? null : "Microphone idle: no app is recording from a mic. The level is live while you are in a call.");
+        }
         return d;
     }
 
@@ -146,8 +161,7 @@ public sealed class AudioSessions : IDisposable
         foreach (var a in apps.Values) foreach (var s in a.Sessions) s.Dispose();
         foreach (var p in procs.Values) p.Meter?.Dispose();
         foreach (var d in devices.Values) d.Dispose();
-        micMeter?.Dispose();
-        mic?.Dispose();
+        foreach (var m in mics.Values) m.Dispose();
         enumerator.Dispose();
     }
 }
