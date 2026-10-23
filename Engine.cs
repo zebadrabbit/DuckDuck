@@ -62,8 +62,9 @@ public sealed class Engine
                     target = c.Target;
                 }
 
+                var apps = audio.Apps();   // once per tick: reading a process meter drains it
                 bool active = false;
-                if (c.Enabled) foreach (var s in c.Sources) if (audio.Peak(s) >= c.ThresholdFor(s)) active = true;
+                if (c.Enabled) foreach (var s in c.Sources) if (apps.GetValueOrDefault(s)?.Peak >= c.ThresholdFor(s)) active = true;
 
                 float? vol = audio.GetVolume(target);
                 if (vol is float v)
@@ -83,7 +84,7 @@ public sealed class Engine
                     ducker.Reset();
                 }
 
-                snap = new Snapshot(audio.Apps(), ducker.State, vol, vol == null ? null : ducker.Rest);
+                snap = new Snapshot(apps, ducker.State, vol, vol == null ? null : ducker.Rest);
             }
             catch (Exception)
             {

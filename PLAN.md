@@ -36,9 +36,11 @@ thing that could sink the project, so it's spiked before any UI.
 
 - `Scan()`: for each active render device → `AudioSessionManager.RefreshSessions()` →
   iterate sessions. Skip PID 0 (system sounds) and expired state. Resolve PID →
-  process name via `Process.GetProcessById(pid).ProcessName`, cached per PID.
+  process name via `Process.GetProcessById(pid).ProcessName`, cached per PID (cache
+  checked against the process start time: Windows reuses PIDs within seconds).
   Group into `Dictionary<string, List<AudioSessionControl>>` keyed by process name.
-- `Peak(name)` = max `AudioMeterInformation.MasterPeakValue` over the group.
+- `Peak(name)` = max `ProcessMeter.Peak()` over the group's processes; session
+  `MasterPeakValue` only when no process could be metered (see v1.0.1 below).
 - `GetVolume(name)` = first session's `SimpleAudioVolume.Volume`.
 - `SetVolume(name, v)` → every session in the group.
 - `ExePath(name)` for icons: `Process.MainModule.FileName`, swallow access errors → null.
@@ -134,3 +136,43 @@ thing that could sink the project, so it's spiked before any UI.
 - Profiles, multiple rules, hotkeys, installer, auto-update.
 - dB-space interpolation: linear mixer units + curves first; revisit if it feels wrong.
 - Device-change notifications: 2 s rescan covers it.
+
+## v1.0.1 — Discord's meter mirrors everything else (found 2026-10-22)
+
+**Symptom:** Brave (target) playing YouTube moves the Discord (source) meter, so Brave ducks
+itself in a loop.
+
+**Cause (measured, not guessed):** Discord's voice engine lives in its *renderer* process
+(PID with `--type=renderer`) and holds a WASAPI **loopback capture** on the output device
+(echo-cancel reference / stream audio). That stream sits in the same audio session as its
+voice output, and `IAudioMeterInformation` on a session counts every stream in it, so
+Discord's session meter equals the endpoint mix: with nobody talking it reads exactly
+Brave's level, sample for sample (0.055 / 0.055). Not a grouping bug; any app that
+loopback-captures (Discord, OBS, Steam Remote Play, GeForce overlay) does this.
+
+**Fix:** meter apps with **Windows process loopback** instead of session meters.
+`ActivateAudioInterfaceAsync` on the process-loopback virtual device with
+`AUDIOCLIENT_ACTIVATION_PARAMS { pid, INCLUDE_TARGET_PROCESS_TREE }` yields a capture
+stream of exactly what that process tree renders, on any device; the target's own capture
+streams are not in it. Prototype verified on this machine: Discord's process meter reads
+0.000 while its session meter shows Brave's 0.055; Brave's and WoW's process meters match
+their session meters.
+
+- `ProcessMeter.cs` (new, ~80 lines): own interop for `ActivateAudioInterfaceAsync` and
+  its completion handler; NAudio's public `AudioClient(IAudioClient)` and
+  `AudioCaptureClient` do the rest. `Peak()` = max |sample| drained since the last call.
+  `TryCreate` returns null when activation fails (Windows before 10 2004) → session meter.
+- `AudioSessions.cs`: one `ProcessMeter` per PID, owned by the PID cache. `Peak(name)` =
+  max over the app's processes; session meters only when no process has a meter. Also
+  check the PID cache against the process start time: Windows reuses a dead PID within
+  seconds, and a stale entry would pin a meter to the wrong app.
+- `Engine.cs`: build `Apps()` once per tick and read source peaks from it (a process meter
+  drains its buffer, so it must be read exactly once per tick).
+- `App.ListApps`: run on an MTA thread; the activation callback deadlocks against a blocked
+  STA thread.
+- SPEC / README / PLAN: the metering sentences.
+
+Decisions to confirm:
+1. Process loopback needs Windows 10 2004+; older Windows silently keeps today's behaviour.
+2. Meter *all* apps this way (UI meters stay truthful) rather than only sources (fewer
+   capture streams). Plan says all apps; ~10 shared-mode capture streams is nothing.

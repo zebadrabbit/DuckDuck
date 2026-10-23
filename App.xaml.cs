@@ -100,14 +100,20 @@ public partial class App : Application
     /// `DuckDuck.exe --list`: dump audio apps + peaks for 5 s. The M2 go/no-go check.
     static void ListApps()
     {
-        using var audio = new AudioSessions();
-        for (int i = 0; i < 10; i++)
+        var t = new Thread(() =>   // MTA like the engine: process-loopback activation calls back from COM and would deadlock a blocked STA
         {
-            audio.Rescan();
-            var line = audio.Apps().Values.OrderBy(a => a.Name)
-                .Select(a => $"{a.Name} peak={a.Peak:0.00} vol={audio.GetVolume(a.Name):0.00}");
-            Console.WriteLine(string.Join("   ", line));
-            Thread.Sleep(500);
-        }
+            using var audio = new AudioSessions();
+            for (int i = 0; i < 10; i++)
+            {
+                audio.Rescan();
+                var line = audio.Apps().Values.OrderBy(a => a.Name)
+                    .Select(a => $"{a.Name} peak={a.Peak:0.00} vol={audio.GetVolume(a.Name):0.00}");
+                Console.WriteLine(string.Join("   ", line));
+                Thread.Sleep(500);
+            }
+        });
+        t.SetApartmentState(ApartmentState.MTA);
+        t.Start();
+        t.Join();
     }
 }

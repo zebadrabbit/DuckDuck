@@ -30,7 +30,7 @@ Windows Core Audio (WASAPI session API). For every active output device, enumera
 audio sessions. Each session exposes:
 
 - process ID
-- a peak meter (`IAudioMeterInformation`) — 0.0–1.0, updated continuously
+- a peak meter (`IAudioMeterInformation`) — fallback only, see *Levels* below
 - a volume (`ISimpleAudioVolume`) — the same slider shown in the Windows Volume Mixer
 
 Ducking writes that per-session mixer volume. It never touches the app's own volume
@@ -41,11 +41,19 @@ Electron apps create sessions under child processes that share the parent's name
 all sessions with a matching name are grouped as one app. Sessions on *all* output
 devices are included, so Discord on a headset + Spotify on speakers works.
 
+**Levels** come from Windows **process loopback** (`ActivateAudioInterfaceAsync` on the
+process-loopback virtual device, Windows 10 2004+): one capture stream per process that
+owns a session, carrying exactly what that process renders, on any device. The session
+meter is not used because it also counts the session's own loopback *captures*: Discord's
+voice engine keeps one open on the output device, so its session meter mirrors the whole
+mix and would duck the target whenever the target itself plays. Session meters are the
+fallback when activation fails (older Windows).
+
 ## Behaviour
 
 Engine ticks every 20 ms:
 
-1. Each source's **level** = max peak over that app's sessions.
+1. Each source's **level** = max process-loopback peak over that app's processes.
 2. **Active** = any source whose level ≥ *its own* threshold (Discord can trigger at
    15 % while Brave triggers at 5 %).
 3. State machine:

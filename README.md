@@ -51,8 +51,9 @@ SmartScreen may warn the first time because the exe isn't code-signed. Click
 
 ![One ducking cycle at the default settings](assets/brand/duck-curve.svg)
 
-Every 20 ms the engine reads the peak level of each source's audio session. If any
-source is above its threshold, the target is **active**:
+Every 20 ms the engine reads the peak level of what each source process is rendering
+(Windows process loopback, so Discord's own tap on the output mix does not count other
+apps' audio as Discord). If any source is above its threshold, the target is **active**:
 
 ```
 Idle ──active──▶ Attack ──done──▶ Ducked ──quiet for Hold ms──▶ Release ──done──▶ Idle
